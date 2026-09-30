@@ -527,6 +527,78 @@ const VIEW_TITLES = {
 // ─── View Renderers ───────────────────────────────────────────────────────────
 
 // 1. Overview & Workstation Dashboard (Investigator-First Priority)
+
+function renderExecutionEnvironmentPanel() {
+  const envInfo = STATE.executionEnv || {};
+  const isCloud = envInfo.cloud_deployment || (typeof envInfo.execution_environment === 'string' && envInfo.execution_environment === 'CLOUD_DEMO');
+  const isAdmin = STATE._isAdmin || false;
+  const hwAccess = envInfo.physical_hardware_access || (isCloud ? 'UNAVAILABLE' : (isAdmin ? 'AVAILABLE' : 'BLOCKED'));
+  const execMode = envInfo.execution_mode || (isCloud ? 'DEMONSTRATION_ONLY' : 'REAL_HARDWARE');
+  const platform = envInfo.platform_human || (isCloud ? 'Render / Linux' : 'Windows');
+
+  if (isCloud) {
+    return `
+    <div class="card" style="border-left:4px solid #3b82f6; background:linear-gradient(135deg,#0f1c35,#0a1628); margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="background:#1d4ed8; color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.08em;">CLOUD DEMO</span>
+        <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.08em;">DEMONSTRATION ONLY</span>
+        <span style="color:#64748b; font-size:11px;">${esc(platform)}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; font-size:11px;">
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">EXECUTION ENVIRONMENT</div>
+          <div style="color:#93c5fd; font-weight:700; margin-top:2px;">CLOUD DEMO</div>
+        </div>
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">PHYSICAL HARDWARE</div>
+          <div style="color:#ef4444; font-weight:700; margin-top:2px;">UNAVAILABLE</div>
+        </div>
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">EXECUTION MODE</div>
+          <div style="color:#fbbf24; font-weight:700; margin-top:2px;">DEMONSTRATION ONLY</div>
+        </div>
+      </div>
+      <div style="margin-top:10px; padding:8px 12px; background:rgba(30,58,95,0.6); border-radius:6px; font-size:11px; color:#93c5fd; line-height:1.6;">
+        Physical PHYSICALDRIVE, ATA, NVMe, USB, and Windows hardware APIs are
+        <strong style="color:#f87171;">unavailable</strong> in this cloud container.
+        Synthetic demo devices are shown for Judge Evaluation purposes only.
+        <span style="color:#86efac; display:block; margin-top:4px;">
+          Application ADMIN role controls application permissions only — it does not grant Windows OS Administrator privileges.
+        </span>
+      </div>
+    </div>`;
+  } else {
+    const hwColor = isAdmin ? '#22c55e' : '#ef4444';
+    const hwText = isAdmin ? 'AVAILABLE' : 'BLOCKED';
+    const adminText = isAdmin ? 'YES' : 'NO';
+    return `
+    <div class="card" style="border-left:4px solid ${isAdmin ? '#22c55e' : '#f59e0b'}; background:linear-gradient(135deg,#0f1a0f,#0a140a); margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="background:#16a34a; color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.08em;">LOCAL WORKSTATION</span>
+        <span style="background:#374151; color:#9ca3af; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:0.08em;">REAL HARDWARE</span>
+        <span style="color:#64748b; font-size:11px;">${esc(platform)}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; font-size:11px;">
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">EXECUTION ENVIRONMENT</div>
+          <div style="color:#86efac; font-weight:700; margin-top:2px;">LOCAL WINDOWS</div>
+        </div>
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">WINDOWS ADMINISTRATOR</div>
+          <div style="color:${isAdmin ? '#22c55e' : '#f59e0b'}; font-weight:700; margin-top:2px;">${adminText}</div>
+        </div>
+        <div>
+          <div style="color:#64748b; font-size:10px; letter-spacing:0.06em;">PHYSICAL HARDWARE ACCESS</div>
+          <div style="color:${hwColor}; font-weight:700; margin-top:2px;">${hwText}</div>
+        </div>
+      </div>
+      ${!isAdmin ? `<div style="margin-top:10px; padding:8px 12px; background:rgba(120,53,15,0.4); border:1px solid #f59e0b44; border-radius:6px; font-size:11px; color:#fcd34d; line-height:1.6;">
+        Windows Administrator privileges are required for physical hardware operations.
+        Close this session and relaunch DREX using <code>run_drex_admin.ps1</code>.
+      </div>` : ''}
+    </div>`;
+  }
+}
 function renderOverview() {
   const activeCase = STATE.activeCase;
   const caseNumber = activeCase ? activeCase.case_number : 'NO ACTIVE CASE';
@@ -537,6 +609,7 @@ function renderOverview() {
   const evidenceCount = (STATE.evidenceItems && STATE.evidenceItems.length) || 0;
   const deviceCount = (STATE.devices && STATE.devices.length) || 0;
   const isSyntheticDevices = STATE.devices && STATE.devices.length > 0 && STATE.devices[0].source === 'SYNTHETIC_DEMO';
+  const isCloudEnv = STATE.executionEnv && STATE.executionEnv.cloud_deployment;
   const lockedCount = (STATE.devices || []).filter(d => d.is_system_disk || d.is_boot_disk).length;
   const auditCount = (STATE.auditEvents && STATE.auditEvents.length) || 0;
   const activeJobsList = Object.values(STATE.activeJobs || {});
@@ -5620,18 +5693,22 @@ function renderDeviceManager() {
 
 // 23. Native Forensic Backend Manager
 function renderBackendManager() {
+  const _isCloudEnv = STATE.executionEnv && STATE.executionEnv.cloud_deployment;
+  const _realExecLabel = _isCloudEnv ? 'DEMONSTRATION WORKFLOW VERIFIED' : 'REAL EXECUTION VERIFIED';
+  const _availLabel = _isCloudEnv ? 'DEMO AVAILABLE' : 'AVAILABLE';
   const backends = [
-    { name: 'The Sleuth Kit (TSK 4.15.0)', category: 'Filesystem Recovery', binary: 'fls.exe / icat.exe / tsk_recover.exe', status: 'AVAILABLE · REAL EXECUTION VERIFIED', badge: 'badge-pass' },
-    { name: 'PhotoRec 7.2 (CGSecurity)', category: 'Raw Carving', binary: 'photorec_win.exe', status: 'AVAILABLE · PARTIAL', badge: 'badge-warn' },
-    { name: 'DeepCarverEngine (DREX)', category: 'In-Process Carving', binary: 'carver_engine.py (Python Standard)', status: 'AVAILABLE · REAL EXECUTION VERIFIED', badge: 'badge-pass' },
-    { name: 'FragmentReassembler (DREX)', category: 'Fragment Continuity', binary: 'fragment_engine.py (Python Standard)', status: 'AVAILABLE · REAL EXECUTION VERIFIED', badge: 'badge-pass' },
-    { name: 'PurePythonPDFWriter (DREX)', category: 'Attestation PDF 1.4', binary: 'certificate_engine.py (Standard Lib)', status: 'AVAILABLE · REAL EXECUTION VERIFIED', badge: 'badge-pass' },
-    { name: 'IndependentPackageVerifier', category: 'Schema 2.0 Verifier', binary: 'drex_verify.py (Self-Contained)', status: 'AVAILABLE · REAL EXECUTION VERIFIED', badge: 'badge-pass' },
+    { name: 'The Sleuth Kit (TSK 4.15.0)', category: 'Filesystem Recovery', binary: 'fls.exe / icat.exe / tsk_recover.exe', status: `${_availLabel} · ${_realExecLabel}`, badge: 'badge-pass' },
+    { name: 'PhotoRec 7.2 (CGSecurity)', category: 'Raw Carving', binary: 'photorec_win.exe', status: `${_availLabel} · PARTIAL`, badge: 'badge-warn' },
+    { name: 'DeepCarverEngine (DREX)', category: 'In-Process Carving', binary: 'carver_engine.py (Python Standard)', status: `${_availLabel} · ${_realExecLabel}`, badge: 'badge-pass' },
+    { name: 'FragmentReassembler (DREX)', category: 'Fragment Continuity', binary: 'fragment_engine.py (Python Standard)', status: `${_availLabel} · ${_realExecLabel}`, badge: 'badge-pass' },
+    { name: 'PurePythonPDFWriter (DREX)', category: 'Attestation PDF 1.4', binary: 'certificate_engine.py (Standard Lib)', status: `${_availLabel} · ${_realExecLabel}`, badge: 'badge-pass' },
+    { name: 'IndependentPackageVerifier', category: 'Schema 2.0 Verifier', binary: 'drex_verify.py (Self-Contained)', status: `${_availLabel} · ${_realExecLabel}`, badge: 'badge-pass' },
     { name: 'GNU ddrescue', category: 'Damaged Media Scraping', binary: 'ddrescue (Native Linux POSIX Required)', status: 'BACKEND UNAVAILABLE · HARDWARE REQUIRED', badge: 'badge-unsupported' },
     { name: 'ATA / NVMe Controller Pass-Through', category: 'Direct Hardware Sanitize', binary: 'Direct SATA 0xEF / PCIe Endpoint Pass-Through', status: 'UNSUPPORTED · HARDWARE REQUIRED', badge: 'badge-unsupported' },
   ];
 
   return `
+    ${renderExecutionEnvironmentPanel()}
     <div class="card">
       <div class="section-label">INFRASTRUCTURE & ENGINE REGISTRY</div>
       <h2 class="card-title">Native Forensic Backend Manager</h2>
@@ -7037,7 +7114,9 @@ async function doLogout() {
   const pill = document.getElementById('activeCasePill');
   if (pill) pill.textContent = 'No Active Case';
   const sp = document.getElementById('statusPill');
-  if (sp) { sp.className = 'pill status-pill-online'; sp.innerHTML = '<i class="dot good"></i> Station Online'; }
+  if (sp) { sp.className = 'pill status-pill-online'; sp.innerHTML = (STATE.executionEnv && STATE.executionEnv.cloud_deployment)
+        ? '<i class="dot good"></i> Cloud Demo Online'
+        : '<i class="dot good"></i> Station Online'; }
   showNotification({ severity: 'INFO', title: 'SIGNED OUT', message: 'Workstation session ended.' });
   // Show auth modal for re-login
   handleAuthenticationRequired('You have signed out. Please sign in again to continue.');
@@ -7210,6 +7289,13 @@ async function loadInitialData(preserveCaseId = null) {
       const cTag = document.getElementById('drexBuildCommit');
       if (cTag) cTag.textContent = health.commit;
     }
+    // Fetch execution environment context (cloud vs local)
+    try {
+      const envInfo = await api('/api/system/environment');
+      STATE.executionEnv = envInfo;
+    } catch (_e) {
+      STATE.executionEnv = null;
+    }
     // Update status pill to ONLINE now that we confirmed connectivity
     const sp = document.getElementById('statusPill');
     if (sp) { sp.className = 'pill status-pill-online'; sp.innerHTML = '<i class="dot good"></i> Station Online'; }
@@ -7217,6 +7303,12 @@ async function loadInitialData(preserveCaseId = null) {
     const isAdmin = health && (health.is_windows_elevated === true || health.is_admin === true);
     STATE._isAdmin = isAdmin;
     _updatePrivilegePill(isAdmin);
+    // Update cloud mode pill if in cloud
+    const envInfo = STATE.executionEnv;
+    if (envInfo && envInfo.cloud_deployment) {
+      const cpill = document.getElementById('cloudEnvPill');
+      if (cpill) { cpill.style.display = 'inline-flex'; }
+    }
 
   } catch (ex) {
     console.error('[DREX Boot] Backend unreachable:', ex.message);

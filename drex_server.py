@@ -193,7 +193,17 @@ thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="drex-worker"
 # â”€â”€â”€ System & Target Metadata Helpers (Phase 21) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_git_commit() -> str:
-    """Obtain current git commit hash with fallback to authoritative baseline."""
+    """Obtain current git commit hash.
+    Priority:
+    1. RENDER_GIT_COMMIT env var (injected by Render at build time)
+    2. git rev-parse --short HEAD (works locally)
+    3. Hardcoded fallback baseline
+    """
+    # Render injects RENDER_GIT_COMMIT during deploy
+    render_commit = os.environ.get("RENDER_GIT_COMMIT", "").strip()
+    if render_commit:
+        return render_commit[:7]
+
     try:
         out = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -204,7 +214,7 @@ def get_git_commit() -> str:
             return out
     except Exception:
         pass
-    return "fbad09d"
+    return "f9978af"
 
 
 def is_protected_filesystem_path(target_path: str) -> Tuple[bool, str]:
@@ -1401,6 +1411,43 @@ def get_version_alias():
     }
 
 
+
+
+@app.get("/api/system/environment")
+def get_execution_environment():
+    """Return transparent execution environment context for UI display.
+    
+    This endpoint allows the UI to clearly distinguish:
+    - CLOUD_DEMO: Render/Linux cloud, synthetic devices, no physical hardware
+    - LOCAL_WINDOWS: Local workstation, real hardware access (elevation required)
+    """
+    is_cloud = sys.platform != "win32"
+    is_admin = DeviceIntelligenceEngine.is_elevated()
+    return {
+        "execution_environment": "CLOUD_DEMO" if is_cloud else "LOCAL_WINDOWS",
+        "execution_mode": "DEMONSTRATION_ONLY" if is_cloud else "REAL_HARDWARE",
+        "platform": sys.platform,
+        "platform_human": "Render / Linux" if is_cloud else f"Windows {platform.release()}",
+        "physical_hardware_access": "UNAVAILABLE" if is_cloud else ("AVAILABLE" if is_admin else "BLOCKED"),
+        "windows_administrator": False if is_cloud else is_admin,
+        "cloud_deployment": is_cloud,
+        "synthetic_devices": is_cloud,
+        "hardware_note": (
+            "Physical PHYSICALDRIVE, ATA/NVMe, and USB enumeration are unavailable in cloud environments. "
+            "Safe synthetic demo devices are presented for Judge Demo evaluation purposes."
+            if is_cloud else (
+                "Physical hardware access available with Windows Administrator privileges."
+                if is_admin else
+                "Physical hardware access requires Windows Administrator privileges. "
+                "Relaunch DREX using run_drex_admin.ps1 to enable hardware operations."
+            )
+        ),
+        "application_roles_note": (
+            "Application roles (ADMIN, OPERATOR, etc.) control application permissions only. "
+            "They do not grant or imply Windows OS Administrator privileges."
+        ),
+    }
+
 # BUG-01 FIX: /api/health explicit route (previously shadowed by SPA catch-all)
 @app.get("/api/health")
 def get_health_status():
@@ -1412,6 +1459,9 @@ def get_health_status():
     """
     commit = get_git_commit()
     is_admin = DeviceIntelligenceEngine.is_elevated()
+    is_cloud = sys.platform != "win32"
+    execution_env = "CLOUD_DEMO" if is_cloud else "LOCAL_WINDOWS"
+    hw_access = "UNAVAILABLE" if is_cloud else ("AVAILABLE" if is_admin else "BLOCKED")
     return {
         "status": "OK",
         "version": "2.0.0",
@@ -1423,12 +1473,24 @@ def get_health_status():
         "privilege_state": "ELEVATED" if is_admin else "STANDARD",
         "privilege_message": (
             "Administrator Mode: Physical device operations available."
-            if is_admin else
-            "Standard user mode. Physical drive erasure requires Administrator privileges. "
-            "Restart DREX using the DREX launcher (run_drex_admin.ps1) and click Yes on UAC."
+            if is_admin else (
+                "Cloud Demo Mode: Physical hardware access is unavailable in this environment. "
+                "Synthetic demonstration devices are active for Judge Demo purposes."
+                if is_cloud else
+                "Standard user mode. Physical drive erasure requires Administrator privileges. "
+                "Restart DREX using the DREX launcher (run_drex_admin.ps1) and click Yes on UAC."
+            )
         ),
         "method_registry_loaded": True,
         "authentication": "ENABLED",
+        # Execution environment transparency fields (Task 3, 4, 5)
+        "execution_environment": execution_env,
+        "execution_mode": "DEMONSTRATION_ONLY" if is_cloud else "REAL_HARDWARE",
+        "hardware_access": hw_access,
+        "physical_hardware_available": not is_cloud and is_admin,
+        "cloud_deployment": is_cloud,
+        "platform": sys.platform,
+        "application_role_note": "ADMIN is an application role only. It does not imply Windows OS Administrator.",
     }
 
 
@@ -4677,7 +4739,7 @@ async def execute_judge_demo_flow(current_user: Dict[str, Any] = Depends(require
         "case_number": c.case_number,
         "steps_completed": demo_steps,
         "elapsed_seconds": 1.45,
-        "verdict": "PASS — FULL FORENSIC PROOF LOOP VERIFIED (SYNTHETIC EVALUATION PROOF)",
+        "verdict": "PASS — DEMONSTRATION WORKFLOW VERIFIED (SYNTHETIC EVALUATION PROOF)",
         "environment": "SYNTHETIC FIXTURE",
         "physical_execution": "NOT EXECUTED",
         "hardware": "NOT REQUIRED FOR THIS FIXTURE",
