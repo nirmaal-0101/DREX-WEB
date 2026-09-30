@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0B1F3A">
+  <meta name="description" content="DREX-V2 Integrated Secure Storage Erasure & Advanced Digital Forensic Recovery Platform">
+  <title>DREX-V2 — Forensic Workstation & Assurance Platform</title>
+  <link rel="stylesheet" href="styles.css?v=2.5.0">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+</head>
+<body>
+  <!-- DREX Boot Splash — shown immediately, dismissed by JS after init -->
+  <div id="drexSplash" class="drex-splash" aria-live="polite" role="status">
+    <div class="splash-logo-mark">D</div>
+    <div class="splash-title">DREX V2</div>
+    <div class="splash-subtitle">Secure Data Erasure &amp; Advanced Recovery</div>
+    <div class="splash-steps" id="splashSteps">
+      <div class="splash-step" id="splash-step-boot">
+        <span class="splash-step-dot">○</span>
+        Initializing workstation...
+      </div>
+      <div class="splash-step" id="splash-step-connect">
+        <span class="splash-step-dot">○</span>
+        Connecting to secure backend...
+      </div>
+      <div class="splash-step" id="splash-step-cases">
+        <span class="splash-step-dot">○</span>
+        Loading case registry...
+      </div>
+      <div class="splash-step" id="splash-step-ready">
+        <span class="splash-step-dot">○</span>
+        Preparing workspace...
+      </div>
+    </div>
+    <div id="splashError" class="splash-error" style="display:none">
+      <div class="splash-error-title">⚠ Backend Unavailable</div>
+      <div class="splash-error-reason" id="splashErrorReason">The DREX backend could not be reached.</div>
+      <div class="splash-error-actions">
+        <button class="splash-btn primary" onclick="window.location.reload()">↺ Retry Connection</button>
+        <button class="splash-btn secondary" onclick="window._splashDismiss && window._splashDismiss(); navigateTo && navigateTo('diagnostics')">Open Diagnostics</button>
+      </div>
+    </div>
+  </div>
+  <div class="app-shell">
+    <!-- Workstation Sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Workstation Navigation">
+      <div class="brand">
+        <div class="brand-mark">D</div>
+        <div class="brand-info">
+          <strong>DREX-V2</strong>
+          <span>FORENSIC ASSURANCE PLATFORM</span>
+        </div>
+      </div>
+
+      <!-- Navigation Cluster (6 Investigator-First Sections) -->
+      <nav class="nav" id="mainNav" aria-label="Workstation Primary Navigation">
+        <!-- 1. WORKSPACE -->
+        <div class="nav-section-label">WORKSPACE</div>
+        <button class="nav-item active" data-view="overview" title="Forensic Workstation Overview">✦ <span>Overview</span></button>
+        <button class="nav-item" data-view="active_operations" title="Real-Time Active Operations Center">⚡ <span>Active Operations</span> <span id="navActiveOpsCount" class="badge" style="margin-left: auto; display: none; font-size: 10px; padding: 1px 6px; background: #2563eb; color: #fff;">0</span></button>
+        <button class="nav-item" data-view="cases" title="Forensic Cases & Timeline">▣ <span>Cases & Timeline</span></button>
+        <button class="nav-item" data-view="vault" title="Immutable Evidence Vault">▤ <span>Evidence Vault</span></button>
+
+        <!-- 2. INVESTIGATE -->
+        <div class="nav-section-label">INVESTIGATE</div>
+        <button class="nav-item" data-view="recovery" title="Forensic Filesystem & Inode Recovery">⌕ <span>Forensic Recovery</span></button>
+        <button class="nav-item" data-view="carving" title="Raw Sector Magic-Byte Carving">◈ <span>Raw File Carving</span></button>
+        <button class="nav-item" data-view="fragments" title="Non-Contiguous Fragment Reconstruction">☲ <span>Fragment Recovery</span></button>
+        <button class="nav-item" data-view="damaged_media" title="Damaged Media & Bad Sector Mapfiles">◬ <span>Damaged Media</span></button>
+        <button class="nav-item" data-view="hex_inspector" title="Live Hex & Byte Stream Inspector">▤ <span>Hex Inspector</span></button>
+        <button class="nav-item" data-view="residue_analyzer" title="Filesystem Residue & Slack Space Scrubber">▦ <span>Residue Analysis</span></button>
+
+        <!-- 3. SANITIZE -->
+        <div class="nav-section-label">SANITIZE</div>
+        <button class="nav-item" data-view="sanitization_planner" title="NIST SP 800-88 Sanitization Planner">◇ <span>Sanitization Planner</span></button>
+        <button class="nav-item" data-view="drive_eraser" title="Privileged Physical Drive Eraser">⨂ <span>Drive Eraser</span></button>
+        <button class="nav-item" data-view="file_eraser" title="File & Folder CSPRNG Shredder">⨁ <span>File & Folder Eraser</span></button>
+
+        <!-- 4. VERIFY -->
+        <div class="nav-section-label">VERIFY</div>
+        <button class="nav-item" data-view="system_validation" title="System Validation & Automated Verification Dashboard">🛡 <span>System Validation</span></button>
+        <button class="nav-item" data-view="verifier" title="Schema 2.0 Independent Verifier">✓ <span>Independent Verifier</span></button>
+        <button class="nav-item" data-view="validation_lab" title="Ground Truth Validation Lab">◌ <span>Validation Lab</span></button>
+        <button class="nav-item" data-view="verification" title="Entropy Verification & 64-Sector Grid">◉ <span>Verification & Entropy</span></button>
+
+        <!-- 5. REPORT -->
+        <div class="nav-section-label">REPORT</div>
+        <button class="nav-item" data-view="audit" title="SHA-256 Hash-Chained Audit Ledger">▤ <span>Audit Chain</span></button>
+        <button class="nav-item" data-view="certificates" title="Tamper-Evident Forensic Certificates">📜 <span>Certificates</span></button>
+        <button class="nav-item" data-view="reports" title="Case Chain-of-Custody Dossier">📋 <span>Forensic Reports</span></button>
+
+        <!-- 6. SYSTEM -->
+        <div class="nav-section-label">SYSTEM</div>
+        <button class="nav-item" data-view="device_intelligence" title="Device Capability & IOCTL Qualification">◉ <span>Device Intelligence</span></button>
+        <button class="nav-item" data-view="device_manager" title="Physical Storage Device Manager">⛃ <span>Device Manager</span></button>
+        <button class="nav-item" data-view="backend_manager" title="Native Forensic Backend Registry">⚙ <span>Backend Manager</span></button>
+        <button class="nav-item" data-view="diagnostics" title="System Elevation & Diagnostics">◒ <span>System Diagnostics</span></button>
+        <button class="nav-item" data-view="performance_lab" title="Throughput & Benchmark Lab">◷ <span>Performance Lab</span></button>
+        <button class="nav-item" data-view="settings" title="Workstation Settings & Backup">⚙ <span>Workstation Settings</span></button>
+        <button class="nav-item" data-view="methods" title="25 Canonical Method Matrix">☷ <span>25 Method Matrix</span></button>
+        <button class="nav-item" data-view="judge_demo" title="Judge Evaluation Demonstration Flow">🎯 <span>Judge Demo Flow</span></button>
+      </nav>
+
+      <!-- Sidebar Bottom Controls -->
+      <div class="sidebar-bottom">
+        <div style="padding: 6px 10px; margin-bottom: 8px; background: rgba(0, 122, 255, 0.08); border-radius: 4px; border: 1px solid rgba(0, 122, 255, 0.2);">
+          <div style="font-size: 10px; font-weight: 700; color: var(--drex-text-muted); letter-spacing: 0.05em;">DREX BUILD:</div>
+          <div style="font-family: var(--drex-font-mono); font-size: 11px; font-weight: 700; color: var(--drex-primary);" id="drexBuildCommit">loading...</div>
+        </div>
+        <div class="system-status">
+          <span><i class="dot good"></i> Cryptographic Tripwires: Active</span>
+          <span><i class="dot good"></i> Dynamic OS Disk Lock: Active</span>
+          <span><i class="dot good"></i> SHA-256 Hash Chain: Sealed</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Viewport Area -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-button mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation">☰</button>
+          <!-- Workstation Identity -->
+          <div class="drex-topbar-identity">
+            <span class="drex-topbar-wordmark">DREX</span>
+            <span class="drex-topbar-tagline">Digital Forensics &amp; Secure Erasure Workstation</span>
+          </div>
+          <div class="topbar-divider"></div>
+          <div class="case-switcher-bar">
+            <span style="font-size:9px;font-weight:800;letter-spacing:0.07em;color:var(--drex-text-muted);">ACTIVE CASE</span>
+            <span class="active-case-tag" id="activeCasePill">No Active Case</span>
+            <span class="case-evidence-count-tag" id="activeCaseEvidenceTag" style="font-size: 11px; color: var(--drex-text-muted); background: var(--drex-bg-surface-subtle); padding: 3px 8px; border-radius: 3px; border: 1px solid var(--drex-border-base);">0 Objects</span>
+            <span class="case-op-status-tag" id="activeCaseOpTag" style="font-size: 11px; color: #168a4a; font-weight: 600;">● Idle</span>
+            <button class="case-switch-btn" id="switchCaseBtn" onclick="openCaseSwitcherModal()" title="Switch Active Case">Switch</button>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Persona Switcher -->
+          <div class="persona-selector">
+            <label for="personaSelect" class="sr-only">Forensic Persona</label>
+            <select id="personaSelect" title="Switch RBAC Persona">
+              <option value="FORENSIC_ANALYST" selected>⌕ Senior Forensic Analyst</option>
+              <option value="INVESTIGATOR">▣ Lead Case Investigator</option>
+              <option value="ADMIN">🔒 Chief Administrator</option>
+              <option value="OPERATOR">◇ Sanitization Technician</option>
+              <option value="AUDITOR">▤ Independent Auditor</option>
+              <option value="JUDGE_DEMO">🎯 Judge Evaluation Persona</option>
+            </select>
+          </div>
+
+          <span class="pill status-pill-online" id="statusPill"><i class="dot good"></i> Station Online</span>
+          <span class="privilege-pill checking" id="elevationPill" onclick="showElevationStatus()" title="Click for privilege details">⟳ Checking...</span>
+          <span class="pill" id="workstationBuildTag" style="font-family: var(--drex-font-mono); font-size: 10px; background: var(--drex-bg-surface-subtle); border: 1px solid var(--drex-border-base); color: var(--drex-text-muted);">BUILD: loading...</span>
+          <button class="icon-button" id="refreshBtn" title="Refresh Live Data">↻</button>
+          <button class="icon-button" id="logoutBtn" title="Sign Out of Workstation" onclick="doLogout()" style="width: auto; padding: 4px 10px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; background: var(--drex-bg-surface-subtle); border: 1px solid var(--drex-border-base); color: var(--drex-text-muted);">⏻ Sign Out</button>
+        </div>
+      </header>
+
+      <!-- Active Content Container -->
+      <section id="appView" class="content" tabindex="-1"></section>
+    </main>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-nav" id="mobileNav" aria-label="Mobile Navigation">
+    <button class="mob-item active" data-view="overview"><span>✦</span><small>Overview</small></button>
+    <button class="mob-item" data-view="cases"><span>▣</span><small>Cases</small></button>
+    <button class="mob-item" data-view="recovery"><span>⌕</span><small>Recovery</small></button>
+    <button class="mob-item" data-view="drive_eraser"><span>⨂</span><small>Sanitize</small></button>
+    <button class="mob-item" data-view="audit"><span>▤</span><small>Audit</small></button>
+    <button class="mob-item" data-view="verifier"><span>✓</span><small>Verify</small></button>
+  </nav>
+
+  <!-- Reusable Details Drawer Overlay -->
+  <div class="drawer-overlay" id="drawerOverlay" style="display: none;" onclick="closeDetailsDrawer()">
+    <aside class="drawer-box" id="drawerBox" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <h3 id="drawerTitle">Artifact Details</h3>
+        <button class="drawer-close-btn" onclick="closeDetailsDrawer()">&times;</button>
+      </div>
+      <div class="drawer-body" id="drawerBody"></div>
+    </aside>
+  </div>
+
+  <!-- Modal Container for Destructive Confirmation, Case Switcher, & Verifier Upload -->
+  <div class="modal-overlay" id="modalOverlay" style="display: none;">
+    <div class="modal-box" id="modalBox"></div>
+  </div>
+
+  <script src="app.js?v=2.5.0"></script>
+  <script src="presentation.js?v=2.0.0"></script>
+  <script src="demo_flow.js?v=1.0.0"></script>
+  <script src="demo_flow_ext.js?v=1.0.0"></script>
+  <script src="judge_eval.js?v=1.0.0"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          reg.update();
+        }).catch((err) => {
+          console.warn('DREX PWA ServiceWorker registration notice:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

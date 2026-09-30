@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: drex-v2
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn drex_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DREX_ENV
+        value: production
+      - key: DREX_JWT_SECRET
+        generateValue: true
+      - key: DREX_DEMO_USERNAME
+        value: drex_operator
+      - key: DREX_DEMO_PASSWORD
+        value: SIH2026DREX
+      - key: DREX_DEMO_ROLE
+        value: judge_demo
+      - key: DREX_DEMO_DISPLAY_NAME
+        value: DREX Demo Operator
+    healthCheckPath: /api/health
+    autoDeploy: false

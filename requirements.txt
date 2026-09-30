@@ -1,0 +1,35 @@
+# DREX V2 — Production Web Server Dependencies
+# =============================================
+# Generated for SIH 2026 Submission — Final Deployment Build
+#
+# Install:   pip install -r requirements.txt
+# Launch:    uvicorn drex_server:app --host 0.0.0.0 --port $PORT
+#
+# All packages verified against drex_server.py, certificate_engine.py,
+# forensic_vault.py, hardware_storage.py, recovery_adapter.py,
+# fragment_engine.py, carver_engine.py, validation_lab.py,
+# performance_lab.py, drex_rbac.py, drex_api_models.py.
+#
+# NOTE: certificate_engine.py, carver_engine.py, entropy_engine.py,
+# fragment_engine.py, forensic_vault.py, validation_lab.py, and
+# performance_lab.py use ONLY Python standard library — no extra deps.
+
+# --- Core Web Framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+starlette>=0.37.0
+python-multipart>=0.0.9
+
+# --- Authentication ---
+PyJWT>=2.8.0
+
+# --- Data Validation ---
+pydantic>=2.7.0
+
+# --- Async / WebSocket support ---
+websockets>=12.0
+anyio>=4.3.0
+
+# --- HTTP Client (used by run_api_tests and live API calls) ---
+httpx>=0.27.0
+requests>=2.31.0
