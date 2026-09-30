@@ -195,14 +195,23 @@ thread_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="drex-worker"
 def get_git_commit() -> str:
     """Obtain current git commit hash.
     Priority:
-    1. RENDER_GIT_COMMIT env var (injected by Render at build time)
-    2. git rev-parse --short HEAD (works locally)
-    3. Hardcoded fallback baseline
+    1. RENDER_GIT_COMMIT env var (Render inject)
+    2. .git-commit-sha file (written by render.yaml buildCommand)
+    3. git rev-parse --short HEAD (local)
+    4. Hardcoded fallback
     """
-    # Render injects RENDER_GIT_COMMIT during deploy
     render_commit = os.environ.get("RENDER_GIT_COMMIT", "").strip()
     if render_commit:
         return render_commit[:7]
+
+    sha_file = ROOT_DIR / '.git-commit-sha'
+    if sha_file.exists():
+        try:
+            sha = sha_file.read_text().strip()
+            if sha and sha != "unknown":
+                return sha
+        except Exception:
+            pass
 
     try:
         out = subprocess.check_output(
@@ -214,7 +223,7 @@ def get_git_commit() -> str:
             return out
     except Exception:
         pass
-    return "f9978af"
+    return "1a7c9d2"
 
 
 def is_protected_filesystem_path(target_path: str) -> Tuple[bool, str]:
