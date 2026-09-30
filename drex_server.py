@@ -4834,11 +4834,9 @@ async def execute_operational_demo_flow(current_user: Dict[str, Any] = Depends(r
         }
     )
     
-    _cloud_target = "DREX-DEMO-USB-01 (DREX Demo USB Storage [SYNTHETIC])"
-    _target_id = _cloud_target if sys.platform != "win32" else str(fixture_file)
     cert_gen_req = models.CertificateGenerateRequest(
         case_id=c.case_id,
-        target_identifier=_target_id,
+        target_identifier=str(fixture_file),
         method_id=8,
         examiner_name=current_user["display_name"],
     )
