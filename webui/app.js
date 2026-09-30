@@ -1923,7 +1923,7 @@ function openEvidenceDetailsDrawer(evidenceId) {
       <div>
         <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">AUDIT CHAIN PREIMAGE:</span>
         <div style="font-family: var(--drex-font-mono); font-size: 10px; background: var(--drex-bg-surface-subtle); padding: 6px 10px; border-radius: 4px; margin-top: 4px; word-break: break-all; color: var(--drex-text-muted);">
-          ${esc(item.audit_event_hash || 'SHA256_AUDIT_PREIMAGE_SEALED')}
+          ${esc(item.audit_event_hash || item.event_hash || 'NOT AVAILABLE')}
         </div>
       </div>
 
@@ -2081,7 +2081,7 @@ function openAuditDetailsDrawer(eventId) {
       <div>
         <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">SHA-256 EVENT DIGEST:</span>
         <div style="font-family: var(--drex-font-mono); font-size: 11px; background: #0b1f3a; color: #a5f3fc; padding: 8px 12px; border-radius: 4px; margin-top: 4px; word-break: break-all;">
-          ${esc(ev.event_hash || ev.sha256_hash || 'CALCULATING_DIGEST')}
+          ${esc(ev.event_hash || ev.sha256_hash || ev.audit_event_hash || 'PENDING')}
         </div>
       </div>
 
@@ -2196,17 +2196,19 @@ async function loadCertificates() {
           <tbody>
             ${STATE.certificates.map(c => `
               <tr>
-                <td><code>${esc(c.certificate_id)}</code></td>
-                <td><strong>${esc(c.target_identifier || 'Logical Target')}</strong></td>
-                <td><span class="badge" style="background:#eaf3ff; color:#1769e0; font-size:10px;">Method M${String(c.method_id || 8).padStart(2, '0')}</span></td>
-                <td>${esc(c.examiner_name || 'Senior Analyst')}</td>
-                <td>${esc(c.created_utc ? c.created_utc.split('T')[0] : 'N/A')}</td>
-                <td style="font-family: var(--drex-font-mono); font-size: 10px;">${esc((c.certificate_hash || '').substring(0, 14))}...</td>
+                <td><code style="font-size:10px;">${esc(c.certificate_id)}</code></td>
+                <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(c.target_name || c.target_identifier || '')}">
+                  <strong>${esc((c.target_name || c.target_identifier || 'N/A').substring(0,35))}${(c.target_name||'').length>35?'…':''}</strong>
+                </td>
+                <td><span class="badge" style="background:#eaf3ff;color:#1769e0;font-size:10px;">M${String(c.method_id||8).padStart(2,'0')}</span></td>
+                <td style="font-size:11px;">${esc(c.examiner_name||'Analyst')}</td>
+                <td style="font-family:var(--drex-font-mono);font-size:10px;">${esc((c.timestamp_utc||c.created_utc||'').split('T')[0]||'N/A')}</td>
+                <td style="font-family:var(--drex-font-mono);font-size:10px;" title="${esc(c.tamper_evident_signature||c.certificate_hash||'')}">${esc((c.tamper_evident_signature||c.certificate_hash||'').substring(0,14))}${(c.tamper_evident_signature||c.certificate_hash||'').length>14?'…':''}</td>
                 <td><span class="badge badge-pass">✓ SEALED</span></td>
-                <td style="white-space: nowrap;">
-                  <button class="action-btn" style="width: auto; padding: 3px 8px; font-size: 10px; background: var(--drex-bg-surface-subtle); color: var(--drex-text-main); border: 1px solid var(--drex-border-base);" onclick="openCertificateDetailsDrawer('${esc(c.certificate_id)}')">Details</button>
-                  <button class="action-btn" style="width: auto; padding: 3px 8px; font-size: 10px; background: var(--drex-primary); color: #fff; margin-left: 3px;" onclick="verifyCertificateAction('${esc(c.case_id || caseId)}', '${esc(c.certificate_id)}')">🛡 Verify</button>
-                  <a href="/api/certificates/${encodeURIComponent(c.certificate_id)}/pdf?case_id=${encodeURIComponent(c.case_id || caseId)}" target="_blank" class="action-btn" style="display: inline-block; width: auto; padding: 3px 8px; font-size: 10px; background: #168a4a; color: #fff; margin-left: 3px; text-decoration: none;">PDF ↓</a>
+                <td style="white-space:nowrap;">
+                  <button class="action-btn" style="width:auto;padding:3px 8px;font-size:10px;background:var(--drex-bg-surface-subtle);color:var(--drex-text-main);border:1px solid var(--drex-border-base);" onclick="openCertificateDetailsDrawer('${esc(c.certificate_id)}')">Details</button>
+                  <button class="action-btn" style="width:auto;padding:3px 8px;font-size:10px;background:var(--drex-primary);color:#fff;margin-left:3px;" onclick="verifyCertificateInDrawer('${esc(c.case_id||caseId)}','${esc(c.certificate_id)}')">🛡 Verify</button>
+                  <button class="action-btn" style="width:auto;padding:3px 8px;font-size:10px;background:#168a4a;color:#fff;margin-left:3px;" onclick="downloadCertificatePdf('${esc(c.certificate_id)}','${esc(c.case_id||caseId)}')">PDF ↓</button>
                 </td>
               </tr>
               <tr id="verifyResult_${esc(c.certificate_id)}" style="display: none;">
@@ -2224,56 +2226,112 @@ async function loadCertificates() {
 
 function openCertificateDetailsDrawer(certId) {
   const c = (STATE.certificates || []).find(item => item.certificate_id === certId);
-  if (!c) return;
+  if (!c) { console.warn('[DREX] Certificate not found in STATE:', certId); return; }
 
-  const html = `
-    <div style="font-size: 12px; display: flex; flex-direction: column; gap: 12px;">
-      <div style="background: var(--drex-bg-surface-subtle); padding: 12px; border-radius: 4px;">
-        <div style="font-size: 10px; font-weight: 800; color: var(--drex-text-muted);">CERTIFICATE IDENTIFIER</div>
-        <div style="font-size: 15px; font-weight: 700; color: var(--drex-primary); margin-top: 2px;">${esc(c.certificate_id)}</div>
-        <div style="font-size: 11px; margin-top: 4px;"><strong>Target: ${esc(c.target_identifier)}</strong> &middot; Method M${String(c.method_id || 8).padStart(2, '0')}</div>
+  // Correct field mapping: API returns tamper_evident_signature, audit_chain_event_hash, timestamp_utc, target_name
+  const sha256Digest = c.tamper_evident_signature || c.certificate_hash || '';
+  const auditPreimage = c.audit_chain_event_hash || c.audit_event_hash || '';
+  const issuanceUtc = c.timestamp_utc || c.created_utc || c.issued_at || '';
+  const targetId = c.target_name || c.target_identifier || '';
+  const caseIdVal = c.case_id || getActiveCaseId() || '';
+  const execState = c.execution_state || 'UNKNOWN';
+  const physExec = c.physical_execution || 'NOT_EXECUTED';
+  const isCloud = (STATE.executionEnv && STATE.executionEnv.cloud_deployment) || execState === 'DEMONSTRATION_ONLY';
+
+  // Execution environment badge
+  const execBadge = isCloud
+    ? `<span style="background:#1d4ed8;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.06em;">CLOUD DEMO</span>
+       <span style="background:#7c3aed;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;margin-left:3px;">DEMONSTRATION ONLY</span>`
+    : `<span style="background:#16a34a;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;">LOCAL WINDOWS</span>`;
+
+  const digestDisplay = sha256Digest && sha256Digest.length === 64
+    ? `<div style="font-family:var(--drex-font-mono);font-size:11px;background:#0b1f3a;color:#a5f3fc;padding:8px 12px;border-radius:4px;margin-top:4px;word-break:break-all;">${esc(sha256Digest)}</div>`
+    : sha256Digest
+      ? `<div style="font-family:var(--drex-font-mono);font-size:11px;background:#0b1f3a;color:#fbbf24;padding:8px 12px;border-radius:4px;margin-top:4px;word-break:break-all;">${esc(sha256Digest)}</div>`
+      : `<div style="font-family:var(--drex-font-mono);font-size:11px;background:#1f0b0b;color:#f87171;padding:8px 12px;border-radius:4px;margin-top:4px;">DIGEST UNAVAILABLE — certificate record may be incomplete</div>`;
+
+  const auditDisplay = auditPreimage && auditPreimage.length === 64
+    ? `<div style="font-family:var(--drex-font-mono);font-size:10px;background:var(--drex-bg-surface-subtle);padding:6px 10px;border-radius:4px;margin-top:4px;word-break:break-all;color:#86efac;">${esc(auditPreimage)}</div>`
+    : auditPreimage
+      ? `<div style="font-family:var(--drex-font-mono);font-size:10px;background:var(--drex-bg-surface-subtle);padding:6px 10px;border-radius:4px;margin-top:4px;word-break:break-all;color:var(--drex-text-muted);">${esc(auditPreimage)}</div>`
+      : `<div style="font-family:var(--drex-font-mono);font-size:10px;background:var(--drex-bg-surface-subtle);padding:6px 10px;border-radius:4px;margin-top:4px;color:var(--drex-text-muted);">${isCloud ? 'NOT AVAILABLE IN CLOUD DEMO' : 'UNAVAILABLE'}</div>`;
+
+  const drawerHtml = `
+    <div style="font-size:12px;display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Execution environment banner -->
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--drex-bg-surface-subtle);border-radius:4px;border-left:3px solid ${isCloud ? '#3b82f6' : '#22c55e'};">
+        ${execBadge}
+        <span style="color:var(--drex-text-muted);font-size:10px;margin-left:4px;">Physical Device: ${isCloud ? 'NO (SYNTHETIC_DEMO)' : (physExec === 'NOT_EXECUTED' ? 'NO (NOT EXECUTED)' : 'YES')}</span>
       </div>
 
-      <div class="grid grid-2" style="gap: 10px;">
+      <!-- Certificate identifier block -->
+      <div style="background:var(--drex-bg-surface-subtle);padding:12px;border-radius:4px;">
+        <div style="font-size:10px;font-weight:800;color:var(--drex-text-muted);">CERTIFICATE IDENTIFIER</div>
+        <div style="font-size:15px;font-weight:700;color:var(--drex-primary);margin-top:2px;">${esc(c.certificate_id)}</div>
+        <div style="font-size:11px;margin-top:4px;">
+          <strong>Target: ${esc(targetId || 'N/A')}</strong> &middot; Method M${String(c.method_id || 8).padStart(2,'0')} &middot; ${esc(c.method_name || 'CSPRNG Random Overwrite')}
+        </div>
+      </div>
+
+      <!-- Grid metadata -->
+      <div class="grid grid-2" style="gap:10px;">
         <div>
-          <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">AUTHORIZED EXAMINER:</span><br>
-          <strong>${esc(c.examiner_name || 'Senior Forensic Analyst')}</strong>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">AUTHORIZED EXAMINER:</span><br>
+          <strong>${esc(c.examiner_name || 'Forensic Analyst')}</strong>
         </div>
         <div>
-          <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">ISSUANCE UTC:</span><br>
-          <span>${esc(c.created_utc || 'N/A')}</span>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">ISSUANCE UTC:</span><br>
+          <span style="font-family:var(--drex-font-mono);font-size:11px;">${esc(issuanceUtc || 'NOT RECORDED')}</span>
         </div>
         <div>
-          <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">BOUND CASE ID:</span><br>
-          <code>${esc(c.case_id || getActiveCaseId())}</code>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">BOUND CASE ID:</span><br>
+          <code style="font-size:10px;">${esc(caseIdVal)}</code>
         </div>
         <div>
-          <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">AUTHENTICITY:</span><br>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">TARGET SOURCE:</span><br>
+          <span class="badge" style="background:${isCloud?'#1e3a5f':'#14532d'};color:${isCloud?'#93c5fd':'#86efac'};font-size:9px;">${isCloud ? 'SYNTHETIC_DEMO' : 'PHYSICAL_HARDWARE'}</span>
+        </div>
+        <div>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">EXECUTION STATE:</span><br>
+          <span style="font-size:11px;font-weight:700;color:${isCloud?'#fbbf24':'#22c55e'};">${esc(execState)}</span>
+        </div>
+        <div>
+          <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">AUTHENTICITY:</span><br>
           <span class="badge badge-pass">✓ TAMPER-EVIDENT</span>
         </div>
       </div>
 
+      <!-- SHA-256 Digest -->
       <div>
-        <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">CERTIFICATE SHA-256 DIGEST:</span>
-        <div style="font-family: var(--drex-font-mono); font-size: 11px; background: #0b1f3a; color: #a5f3fc; padding: 8px 12px; border-radius: 4px; margin-top: 4px; word-break: break-all;">
-          ${esc(c.certificate_hash || 'CALCULATING_DIGEST')}
-        </div>
+        <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">CERTIFICATE SHA-256 DIGEST (Tamper-Evident Signature):</span>
+        ${digestDisplay}
       </div>
 
+      <!-- Audit chain preimage -->
       <div>
-        <span style="color: var(--drex-text-muted); font-size: 10px; font-weight: 700;">AUDIT CHAIN PREIMAGE LINK:</span>
-        <div style="font-family: var(--drex-font-mono); font-size: 10px; background: var(--drex-bg-surface-subtle); padding: 6px 10px; border-radius: 4px; margin-top: 4px; word-break: break-all; color: var(--drex-text-muted);">
-          ${esc(c.audit_event_hash || 'SHA256_AUDIT_PREIMAGE_SEALED')}
-        </div>
+        <span style="color:var(--drex-text-muted);font-size:10px;font-weight:700;">AUDIT CHAIN EVENT HASH (SHA-256 Preimage Link):</span>
+        ${auditDisplay}
       </div>
 
-      <div style="margin-top: 10px; display: flex; gap: 8px;">
-        <a href="/api/certificates/${encodeURIComponent(c.certificate_id)}/pdf?case_id=${encodeURIComponent(c.case_id || getActiveCaseId())}" target="_blank" class="action-btn" style="text-align: center; text-decoration: none; background: #168a4a; color: #fff; padding: 6px 12px; font-size: 11px;">📥 Download PDF Attestation</a>
-        <button class="action-btn" style="background: var(--drex-primary); color: #fff; padding: 6px 12px; font-size: 11px;" onclick="verifyCertificateAction('${esc(c.case_id || getActiveCaseId())}', '${esc(c.certificate_id)}')">🛡 Re-Verify Cryptographic Signatures</button>
+      <!-- Verification result placeholder (filled by Re-Verify) -->
+      <div id="certDetailVerifyResult_${esc(c.certificate_id)}" style="display:none;padding:8px 12px;border-radius:4px;font-size:11px;"></div>
+
+      <!-- Action buttons -->
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="action-btn" style="text-align:center;background:#168a4a;color:#fff;padding:6px 12px;font-size:11px;"
+          onclick="downloadCertificatePdf('${esc(c.certificate_id)}','${esc(caseIdVal)}')">
+          📥 Download PDF Attestation
+        </button>
+        <button class="action-btn" style="background:var(--drex-primary);color:#fff;padding:6px 12px;font-size:11px;"
+          onclick="verifyCertificateInDrawer('${esc(caseIdVal)}','${esc(c.certificate_id)}')">
+          🛡 Re-Verify Cryptographic Signatures
+        </button>
       </div>
+
     </div>
   `;
-  openDetailsDrawer(`Certificate: ${c.certificate_id}`, html);
+  openDetailsDrawer('Certificate: ' + c.certificate_id, drawerHtml);
 }
 
 // 7. Forensic Filesystem Recovery (6-Step Structured Workflow)
@@ -6918,6 +6976,100 @@ async function generateCertificateForActiveCase() {
       message: ex.message || String(ex),
       caseId: caseId,
       workflowId: 'certificates',
+    });
+  }
+}
+
+
+async function downloadCertificatePdf(certId, caseId) {
+  // Fetch PDF with auth token and open in new tab via blob URL.
+  // <a href> cannot send the Authorization header — this JS function does.
+  const token = STATE.token || (typeof localStorage !== 'undefined' && localStorage.getItem('drex_auth_token')) || '';
+  const url = (window.API_BASE || '') + '/api/certificates/' + encodeURIComponent(certId) + '/pdf?case_id=' + encodeURIComponent(caseId || '');
+  const errBoxId = 'certDetailVerifyResult_' + certId;
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+    });
+    if (!resp.ok) {
+      let errText = '';
+      try { errText = await resp.text(); } catch (_) {}
+      throw new Error('HTTP ' + resp.status + ' ' + resp.statusText + (errText ? ': ' + errText.substring(0, 120) : ''));
+    }
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const tab = window.open(blobUrl, '_blank');
+    if (!tab) {
+      // Popup blocked: fallback to download link
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = certId + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+  } catch (ex) {
+    const msg = (ex && ex.message) ? ex.message : String(ex);
+    const errBox = document.getElementById(errBoxId);
+    if (errBox) {
+      errBox.style.display = 'block';
+      errBox.style.background = '#fef2f2';
+      errBox.style.color = '#991b1b';
+      errBox.style.border = '1px solid #ef4444';
+      errBox.style.padding = '8px 12px';
+      errBox.style.borderRadius = '4px';
+      errBox.innerHTML = '<strong>PDF Download Failed:</strong> ' + esc(msg);
+    } else {
+      alert('PDF Download Failed: ' + msg);
+    }
+  }
+}
+
+async function verifyCertificateInDrawer(caseId, certId) {
+  const drawerBox = document.getElementById('certDetailVerifyResult_' + certId);
+  const tableBox = document.getElementById('verifyResult_' + certId);
+  [drawerBox, tableBox].filter(Boolean).forEach(function(box) {
+    box.style.display = 'block';
+    box.style.background = 'var(--drex-bg-surface-subtle)';
+    box.style.border = '';
+    box.style.color = 'var(--drex-text-muted)';
+    box.style.padding = '8px 12px';
+    box.style.borderRadius = '4px';
+    box.innerHTML = '<em>Verifying cryptographic signatures and audit chain linkage...</em>';
+  });
+  try {
+    const res = await api('/api/certificates/verify', {
+      method: 'POST',
+      body: JSON.stringify({ case_id: caseId, certificate_id: certId }),
+    });
+    var isValid = res && res.valid;
+    var verifyHtml = isValid
+      ? '<strong style="color:#065f46;">\u2713 VERIFIED \u2014 ' + esc(res.verdict) + '</strong>'
+        + '<div style="font-size:10px;margin-top:4px;color:#047857;">'
+        + 'Cert Hash: ' + (res.certificate_hash_valid ? '\u2713 VALID' : '\u2715 INVALID') + ' &middot; '
+        + 'PDF Hash: ' + (res.pdf_hash_valid ? '\u2713 VALID' : '\u2715 INVALID') + ' &middot; '
+        + 'Audit Chain: ' + (res.audit_chain_valid ? '\u2713 VALID' : '\u2715 INVALID') + ' &middot; '
+        + 'Case Binding: ' + (res.case_binding_valid ? '\u2713 VALID' : '\u2715 INVALID')
+        + '</div>'
+      : '<strong style="color:#991b1b;">\u2715 VERIFICATION FAILED \u2014 ' + esc(res && res.verdict ? res.verdict : 'FAILED') + '</strong>'
+        + '<div style="font-size:10px;margin-top:4px;">' + ((res && res.details) || []).map(function(d) { return '&bull; ' + esc(d); }).join('<br>') + '</div>';
+    var bg = isValid ? '#ecfdf5' : '#fef2f2';
+    var border = isValid ? '1px solid #10b981' : '1px solid #ef4444';
+    [drawerBox, tableBox].filter(Boolean).forEach(function(box) {
+      box.style.background = bg;
+      box.style.border = border;
+      box.innerHTML = verifyHtml;
+    });
+  } catch (ex) {
+    var errMsg = 'VERIFICATION UNAVAILABLE: ' + esc((ex && ex.message) ? ex.message : String(ex));
+    [drawerBox, tableBox].filter(Boolean).forEach(function(box) {
+      box.style.display = 'block';
+      box.style.background = '#fef2f2';
+      box.style.border = '1px solid #ef4444';
+      box.style.color = '#991b1b';
+      box.innerHTML = errMsg;
     });
   }
 }

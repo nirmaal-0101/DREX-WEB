@@ -3778,6 +3778,60 @@ def generate_certificate(
         forensic_limitations=cert.forensic_limitations,
     )
 
+
+
+def _build_cert_record(c: dict, case_id: str) -> "models.CertificateRecordModel":
+    """Build CertificateRecordModel with cloud execution transparency fields."""
+    is_cloud = sys.platform != "win32"
+    cert_id_val = c.get("certificate_id", "")
+    
+    # Cloud-aware target name: substitute Linux path with DREX-DEMO-USB-01
+    raw_target = c.get("target", {}).get("target_name", c.get("target_name", "TARGET"))
+    if is_cloud and (raw_target.startswith("/opt/render") or raw_target.startswith("/tmp")):
+        display_target = "DREX-DEMO-USB-01 (DREX Demo USB Storage [SYNTHETIC])"
+    else:
+        display_target = raw_target
+
+    # Cloud-aware execution state
+    raw_exec = c.get("truth_model", {}).get("execution", "REAL")
+    display_exec = "DEMONSTRATION_ONLY" if is_cloud else raw_exec
+
+    # Cloud-aware case name
+    raw_case_name = c.get("case_name", "Case")
+    if is_cloud and "Real Fixture" in raw_case_name:
+        display_case_name = raw_case_name.replace("Real Fixture Execution", "Cloud Demo Execution")
+    else:
+        display_case_name = raw_case_name
+
+    actual_case = c.get("case_id", case_id)
+    return models.CertificateRecordModel(
+        certificate_id=cert_id_val,
+        certificate_version=c.get("certificate_version", "2.0"),
+        case_id=actual_case,
+        case_name=display_case_name,
+        examiner_name=c.get("examiner_name", "Examiner"),
+        organization=c.get("organization", "Lab"),
+        timestamp_utc=c.get("timestamp_utc", ""),
+        target_name=display_target,
+        target_type=c.get("target", {}).get("target_type", c.get("target_type", "FILE")),
+        device_model=c.get("target", {}).get("device_model", c.get("device_model", "SYNTHETIC_DEMO" if is_cloud else "GENERIC_STORAGE")),
+        serial_number=c.get("target", {}).get("serial_number", c.get("serial_number", "DREX-DEMO-001" if is_cloud else "UNKNOWN_SERIAL")),
+        capacity_bytes=c.get("target", {}).get("capacity_bytes", c.get("capacity_bytes", 0)),
+        method_id=c.get("method", {}).get("method_id", c.get("method_id", 8)),
+        method_name=c.get("method", {}).get("canonical_name", c.get("method_name", "Method")),
+        standard_reference=c.get("method", {}).get("standard_reference", c.get("standard_reference", "NIST SP 800-88 Rev. 2 aligned")),
+        pass_count=c.get("method", {}).get("pass_count", c.get("pass_count", 1)),
+        execution_state=display_exec,
+        verification_state=c.get("truth_model", {}).get("verification", c.get("verification_state", "DEMONSTRATION_VERIFIED" if is_cloud else "EXACT_READBACK")),
+        physical_execution="NOT_EXECUTED" if is_cloud else c.get("truth_model", {}).get("physical_execution", c.get("physical_execution", "NOT_EXECUTED")),
+        prior_audit_hash=c.get("audit_chain_prior_hash", c.get("prior_audit_hash", "")),
+        audit_chain_event_hash=c.get("audit_chain_event_hash", ""),
+        tamper_evident_signature=c.get("tamper_evident_signature", ""),
+        pdf_sha256=c.get("pdf_sha256"),
+        pdf_download_url=f"/api/certificates/{cert_id_val}/pdf?case_id={actual_case}",
+        forensic_limitations=c.get("forensic_limitations", []),
+    )
+
 @app.get("/api/certificates", response_model=List[models.CertificateRecordModel])
 def list_certificates(
     case_id: Optional[str] = None,
@@ -3793,37 +3847,7 @@ def list_certificates(
         return []
 
     certs = case_manager.list_certificates(case_id)
-    records = []
-    for c in certs:
-        records.append(
-            models.CertificateRecordModel(
-                certificate_id=c.get("certificate_id", ""),
-                certificate_version=c.get("certificate_version", "2.0"),
-                case_id=c.get("case_id", case_id),
-                case_name=c.get("case_name", "Case"),
-                examiner_name=c.get("examiner_name", "Examiner"),
-                organization=c.get("organization", "Lab"),
-                timestamp_utc=c.get("timestamp_utc", ""),
-                target_name=c.get("target", {}).get("target_name", "TARGET"),
-                target_type=c.get("target", {}).get("target_type", "FILE"),
-                device_model=c.get("target", {}).get("device_model", "GENERIC_STORAGE"),
-                serial_number=c.get("target", {}).get("serial_number", "UNKNOWN_SERIAL"),
-                capacity_bytes=c.get("target", {}).get("capacity_bytes", 0),
-                method_id=c.get("method", {}).get("method_id", 0),
-                method_name=c.get("method", {}).get("canonical_name", "Method"),
-                standard_reference=c.get("method", {}).get("standard_reference", "NIST SP 800-88 Rev. 2 aligned"),
-                pass_count=c.get("method", {}).get("pass_count", 1),
-                execution_state=c.get("truth_model", {}).get("execution", "REAL"),
-                verification_state=c.get("truth_model", {}).get("verification", "EXACT_READBACK"),
-                physical_execution=c.get("truth_model", {}).get("physical_execution", "NOT_EXECUTED"),
-                prior_audit_hash=c.get("audit_chain_prior_hash", ""),
-                audit_chain_event_hash=c.get("audit_chain_event_hash", ""),
-                tamper_evident_signature=c.get("tamper_evident_signature", ""),
-                pdf_sha256=c.get("pdf_sha256"),
-                pdf_download_url=f"/api/certificates/{c.get('certificate_id')}/pdf?case_id={c.get('case_id', case_id)}",
-                forensic_limitations=c.get("forensic_limitations", []),
-            )
-        )
+    records = [_build_cert_record(c, case_id) for c in certs]
     return records[offset : offset + limit]
 
 
@@ -3849,33 +3873,7 @@ def get_certificate_details(
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Certificate '{cert_id}' not found in case '{target_case_id}'.")
 
-    return models.CertificateRecordModel(
-        certificate_id=c.get("certificate_id", ""),
-        certificate_version=c.get("certificate_version", "2.0"),
-        case_id=c.get("case_id", target_case_id),
-        case_name=c.get("case_name", "Case"),
-        examiner_name=c.get("examiner_name", "Examiner"),
-        organization=c.get("organization", "Lab"),
-        timestamp_utc=c.get("timestamp_utc", ""),
-        target_name=c.get("target", {}).get("target_name", "TARGET"),
-        target_type=c.get("target", {}).get("target_type", "FILE"),
-        device_model=c.get("target", {}).get("device_model", "GENERIC_STORAGE"),
-        serial_number=c.get("target", {}).get("serial_number", "UNKNOWN_SERIAL"),
-        capacity_bytes=c.get("target", {}).get("capacity_bytes", 0),
-        method_id=c.get("method", {}).get("method_id", 0),
-        method_name=c.get("method", {}).get("canonical_name", "Method"),
-        standard_reference=c.get("method", {}).get("standard_reference", "NIST SP 800-88 Rev. 2 aligned"),
-        pass_count=c.get("method", {}).get("pass_count", 1),
-        execution_state=c.get("truth_model", {}).get("execution", "REAL"),
-        verification_state=c.get("truth_model", {}).get("verification", "EXACT_READBACK"),
-        physical_execution=c.get("truth_model", {}).get("physical_execution", "NOT_EXECUTED"),
-        prior_audit_hash=c.get("audit_chain_prior_hash", ""),
-        audit_chain_event_hash=c.get("audit_chain_event_hash", ""),
-        tamper_evident_signature=c.get("tamper_evident_signature", ""),
-        pdf_sha256=c.get("pdf_sha256"),
-        pdf_download_url=f"/api/certificates/{c.get('certificate_id')}/pdf?case_id={c.get('case_id', target_case_id)}",
-        forensic_limitations=c.get("forensic_limitations", []),
-    )
+    return _build_cert_record(c, target_case_id)
 
 
 @app.get("/api/certificates/{cert_id}/pdf")
@@ -4773,7 +4771,7 @@ async def execute_operational_demo_flow(current_user: Dict[str, Any] = Depends(r
     op_case_num = f"OP-DEMO-{time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
     c = case_manager.create_case(
         case_number=op_case_num,
-        title="Operational Demonstration Case — Real Fixture Execution",
+        title="Operational Demonstration Case — Cloud Demo Execution" if sys.platform != "win32" else "Operational Demonstration Case — Real Fixture Execution",
         examiner=current_user["display_name"],
         organization="DREX Forensic Assurance",
         description="Real isolated workstation fixture carving, CSPRNG sanitization, entropy proof, and SHA-256 ledger sealing.",
@@ -4836,9 +4834,11 @@ async def execute_operational_demo_flow(current_user: Dict[str, Any] = Depends(r
         }
     )
     
+    _cloud_target = "DREX-DEMO-USB-01 (DREX Demo USB Storage [SYNTHETIC])"
+    _target_id = _cloud_target if sys.platform != "win32" else str(fixture_file)
     cert_gen_req = models.CertificateGenerateRequest(
         case_id=c.case_id,
-        target_identifier=str(fixture_file),
+        target_identifier=_target_id,
         method_id=8,
         examiner_name=current_user["display_name"],
     )
@@ -4881,6 +4881,11 @@ async def execute_operational_demo_flow(current_user: Dict[str, Any] = Depends(r
 
     cert_gen_req.job_id = demo_job_id
     cert_model = generate_certificate(cert_gen_req, current_user)
+    # Cloud override: execution state is DEMONSTRATION_ONLY, not REAL
+    if sys.platform != "win32":
+        object.__setattr__(cert_model, "execution_state", "DEMONSTRATION_ONLY")
+        object.__setattr__(cert_model, "case_name",
+            "Operational Demonstration Case — Cloud Demo Execution")
     cert_id = cert_model.certificate_id
     
     steps_completed.append({
