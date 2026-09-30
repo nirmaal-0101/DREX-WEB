@@ -1511,32 +1511,84 @@ def list_devices(current_user: Dict[str, Any] = Depends(require_permission("devi
     Stage 3: Deduplication & Aggregation (mount point aggregation & safety flag union)
     Stage 4: Final Device List (1 physical drive = exactly 1 canonical descriptor)
     """
+    import sys as _sys
+    # -- Cloud/Linux guard ---------------------------------------------------
+    if _sys.platform != 'win32':
+        # Render/Linux: physical hardware APIs unavailable.
+        # Return clearly-labelled synthetic demo inventory only.
+        return [
+            models.DeviceDescriptor(
+                device_id='DREX-DEMO-DISK-01',
+                device_path='DREX-DEMO-DISK-01',
+                model='DREX Demo System Disk [SYNTHETIC]',
+                serial_number='DEMO-SSD-0001',
+                bus_type='DEMO-SATA',
+                media_type='SSD',
+                capacity_bytes=512 * 1024 * 1024 * 1024,
+                capacity_human='512.0 GB',
+                sector_size=512,
+                is_system_disk=True,
+                is_boot_disk=True,
+                is_removable=False,
+                is_write_protected=True,
+                mount_points=['DEMO:/'],
+                hardware_qualification_status='PROTECTED_SYSTEM_DISK',
+                safety_block_reason='Synthetic Demo System Disk - Destructive Hardware Access Blocked',
+                source='SYNTHETIC_DEMO',
+                execution_mode='DEMONSTRATION_ONLY',
+                is_physical_device=False,
+            ),
+            models.DeviceDescriptor(
+                device_id='DREX-DEMO-USB-01',
+                device_path='DREX-DEMO-USB-01',
+                model='DREX Demo USB Storage [SYNTHETIC]',
+                serial_number='DEMO-USB-0001',
+                bus_type='DEMO-USB3',
+                media_type='Flash',
+                capacity_bytes=32 * 1024 * 1024 * 1024,
+                capacity_human='32.0 GB',
+                sector_size=512,
+                is_system_disk=False,
+                is_boot_disk=False,
+                is_removable=True,
+                is_write_protected=False,
+                mount_points=['DEMO:/usb'],
+                hardware_qualification_status='QUALIFIED',
+                safety_block_reason=None,
+                source='SYNTHETIC_DEMO',
+                execution_mode='DEMONSTRATION_ONLY',
+                is_physical_device=False,
+            ),
+        ]
+    # -- Windows: real hardware discovery ------------------------------------
     import drex_app
     drives = drex_app.discover_drives()
     canonical_devices: Dict[str, models.DeviceDescriptor] = {}
 
     for d in drives:
-        dev_id = d.device_id or d.path
-        dev_path = d.device_path or d.path
+        dev_id = getattr(d, "device_id", None) or getattr(d, "path", "") or "DEVICE"
+        dev_path = getattr(d, "device_path", None) or getattr(d, "path", "") or dev_id
 
         # Stage 2: Normalization — Extract canonical physical device identifier
-        norm_dev = dev_path.strip().lower()
+        norm_dev = str(dev_path).strip().lower()
         m = re.search(r"physicaldrive(\d+)", norm_dev)
+        d_serial = getattr(d, "serial", None) or ""
         if m:
             canon_key = f"\\\\.\\PhysicalDrive{m.group(1)}"
-        elif d.serial and d.serial not in ("UNKNOWN_SERIAL", "SYNTHETIC"):
-            canon_key = f"SERIAL:{d.serial.strip()}"
+        elif d_serial and d_serial not in ("UNKNOWN_SERIAL", "SYNTHETIC", "N/A"):
+            canon_key = f"SERIAL:{d_serial.strip()}"
         else:
             canon_key = norm_dev
 
-        sys_disk = bool(d.is_system_or_boot or DeviceIntelligenceEngine.is_system_drive(dev_path))
-        cap = int(d.capacity or 0)
+        sys_disk = bool(getattr(d, "is_system_or_boot", False) or getattr(d, "is_system", False) or getattr(d, "is_boot", False) or DeviceIntelligenceEngine.is_system_drive(dev_path))
+        cap = int(getattr(d, "capacity", None) or getattr(d, "size_bytes", None) or 0)
 
         # Stage 3: Deduplication & Aggregation
         if canon_key in canonical_devices:
             rec = canonical_devices[canon_key]
-            if d.path and d.path not in rec.mount_points:
-                rec.mount_points.append(d.path)
+            d_path = getattr(d, "path", None)
+            if d_path and d_path not in rec.mount_points:
+                rec.mount_points.append(d_path)
             if sys_disk and not rec.is_system_disk:
                 rec.is_system_disk = True
                 rec.is_boot_disk = True
@@ -1554,20 +1606,23 @@ def list_devices(current_user: Dict[str, Any] = Depends(require_permission("devi
         canonical_devices[canon_key] = models.DeviceDescriptor(
             device_id=dev_id,
             device_path=dev_path,
-            model=d.model or "Storage Target",
-            serial_number=d.serial or "UNKNOWN_SERIAL",
-            bus_type=str(d.transport_bus or d.interface or "USB"),
-            media_type=str(d.media_type or "HDD"),
+            model=getattr(d, "model", None) or "Storage Target",
+            serial_number=d_serial or "UNKNOWN_SERIAL",
+            bus_type=str(getattr(d, "transport_bus", None) or getattr(d, "interface", None) or getattr(d, "interface_type", None) or "LOCAL"),
+            media_type=str(getattr(d, "media_type", None) or "HDD"),
             capacity_bytes=cap,
             capacity_human=cap_human,
-            sector_size=int(d.sector_size or 512),
+            sector_size=int(getattr(d, "sector_size", None) or 512),
             is_system_disk=sys_disk,
             is_boot_disk=sys_disk,
-            is_removable=bool(d.is_usb_bridge or d.drive_type == "Removable"),
+            is_removable=bool(getattr(d, "is_usb_bridge", False) or str(getattr(d, "drive_type", "")) in ("Removable", "2")),
             is_write_protected=False,
-            mount_points=[d.path] if d.path else [],
+            mount_points=[getattr(d, "path", "")] if getattr(d, "path", None) else [],
             hardware_qualification_status="PROTECTED_SYSTEM_DISK" if sys_disk else "QUALIFIED",
             safety_block_reason="Operating System / Active Boot Disk Locked" if sys_disk else None,
+            source="PHYSICAL_HARDWARE",
+            execution_mode="REAL_HARDWARE",
+            is_physical_device=True,
         )
 
     # Stage 4: Final Device List

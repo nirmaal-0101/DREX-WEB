@@ -536,6 +536,7 @@ function renderOverview() {
   const createdDate = activeCase && activeCase.created_utc ? activeCase.created_utc.split('T')[0] : 'N/A';
   const evidenceCount = (STATE.evidenceItems && STATE.evidenceItems.length) || 0;
   const deviceCount = (STATE.devices && STATE.devices.length) || 0;
+  const isSyntheticDevices = STATE.devices && STATE.devices.length > 0 && STATE.devices[0].source === 'SYNTHETIC_DEMO';
   const lockedCount = (STATE.devices || []).filter(d => d.is_system_disk || d.is_boot_disk).length;
   const auditCount = (STATE.auditEvents && STATE.auditEvents.length) || 0;
   const activeJobsList = Object.values(STATE.activeJobs || {});
@@ -3608,7 +3609,7 @@ function renderDriveEraser() {
       <div class="card" style="border-left: 4px solid ${isLocked ? 'var(--drex-status-fail)' : 'var(--drex-primary)'};">
         <div style="display: flex; justify-content: space-between; align-items: start;">
           <div>
-            <span class="badge ${isLocked ? 'badge-fail' : 'badge-pass'}">${isLocked ? '🔒 SYSTEM DISK PROTECTED' : 'QUALIFIED TARGET'}</span>
+            <span class="badge ${isLocked ? 'badge-fail' : (d.source === 'SYNTHETIC_DEMO' ? 'badge-warn' : 'badge-pass')}">${isLocked ? '🔒 SYSTEM DISK PROTECTED' : 'QUALIFIED TARGET'}</span>
             <h3 style="font-size: 15px; margin: 6px 0 2px;">${esc(d.model)} (${esc(d.device_path)})</h3>
             <div style="font-size: 11px; color: var(--drex-text-muted);">Bus: <strong>${esc(d.bus_type)}</strong> · Capacity: <strong>${esc(d.capacity_human)}</strong> · Serial: ${esc(d.serial_number)}</div>
           </div>
@@ -5566,7 +5567,7 @@ function renderDeviceManager() {
         <td>${esc(d.capacity_human)}</td>
         <td style="font-family: var(--drex-font-mono); font-size: 10px;">${esc(d.serial_number)}</td>
         <td>${d.sector_size} B</td>
-        <td><span class="badge ${isLocked ? 'badge-fail' : 'badge-pass'}">${isLocked ? '🔒 OS LOCKED' : 'QUALIFIED'}</span></td>
+        <td><span class="badge ${isLocked ? 'badge-fail' : 'badge-pass'}">${isLocked ? '🔒 OS LOCKED' : (d.source === 'SYNTHETIC_DEMO' ? '⚠️ SYNTHETIC DEMO' : 'QUALIFIED')}</span></td>
         <td>
           ${isLocked ? '<span style="color:#64748b; font-size:11px;">Write Protected</span>' : `<button class="action-btn" style="padding: 3px 8px; font-size: 10px; background: var(--drex-primary); color: #fff;" onclick="navigateTo('drive_eraser')">Sanitize →</button>`}
         </td>
@@ -5580,6 +5581,18 @@ function renderDeviceManager() {
         <div>
           <div class="section-label">STORAGE INFRASTRUCTURE</div>
           <h2 class="card-title">Physical Storage Device Manager</h2>
+          ${(STATE.devices.length > 0 && STATE.devices[0].source === 'SYNTHETIC_DEMO') ? `
+            <div style="background:linear-gradient(135deg,#1e3a5f,#0f2d4a); border:1px solid #3b82f6; border-radius:8px; padding:12px 16px; margin-top:10px; margin-bottom:4px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span style="background:#1d4ed8; color:#fff; font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; letter-spacing:0.05em;">CLOUD ENVIRONMENT</span>
+                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; letter-spacing:0.05em;">SYNTHETIC DEMO</span>
+              </div>
+              <p style="color:#93c5fd; font-size:12px; margin:0; line-height:1.5;">
+                Physical hardware access is <strong>unavailable</strong> in cloud deployment. Real PHYSICALDRIVE, ATA, NVMe, and USB enumeration require local Windows execution.<br>
+                <span style="color:#86efac;">Safe synthetic demo devices are shown below for Judge Demo purposes only.</span>
+              </p>
+            </div>
+          ` : ''}
           <p style="color: var(--drex-text-muted); font-size: 12px; margin-top: 4px;">
             Enumerate connected physical drives, verify volume mount points, and observe dynamic OS protection locks.
           </p>
@@ -5592,7 +5605,13 @@ function renderDeviceManager() {
           <thead>
             <tr><th>Device Path</th><th>Model</th><th>Bus</th><th>Capacity</th><th>Serial Number</th><th>Sector</th><th>Tripwire</th><th>Action</th></tr>
           </thead>
-          <tbody>${devRows || '<tr><td colspan="8">No storage devices discovered.</td></tr>'}</tbody>
+          <tbody>${devRows || (() => {
+    const isCloud = STATE.devices.length > 0 && STATE.devices[0].source === 'SYNTHETIC_DEMO';
+    if (STATE.devices.length === 0) {
+      return '<tr><td colspan="8" style="color:#94a3b8; text-align:center; padding:16px;">No storage devices discovered. Physical hardware access unavailable in this environment.</td></tr>';
+    }
+    return '';
+  })()}</tbody>
         </table>
       </div>
     </div>

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
-# ─── Enumerations ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ Enumerations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class UserRole(str, Enum):
     ADMIN = "ADMIN"
@@ -28,9 +28,9 @@ class UserRole(str, Enum):
 
 class ExecutionTruthState(str, Enum):
     LIVE = "LIVE"
-    PASS_REAL = "PASS — REAL EXECUTION VERIFIED"
-    PASS_DECISION = "PASS — DECISION ENGINE VERIFIED"
-    PASS_SYNTHETIC = "PASS — SYNTHETIC BACKEND VERIFIED"
+    PASS_REAL = "PASS â€” REAL EXECUTION VERIFIED"
+    PASS_DECISION = "PASS â€” DECISION ENGINE VERIFIED"
+    PASS_SYNTHETIC = "PASS â€” SYNTHETIC BACKEND VERIFIED"
     PARTIAL = "PARTIAL"
     UNSUPPORTED = "UNSUPPORTED"
     BACKEND_UNAVAILABLE = "BACKEND UNAVAILABLE"
@@ -50,7 +50,7 @@ class JobLifecycleState(str, Enum):
     VERIFICATION_FAILED = "VERIFICATION_FAILED"
 
 
-# ─── Authentication Models ───────────────────────────────────────────────────
+# â”€â”€â”€ Authentication Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class LoginRequest(BaseModel):
     username: str = Field(..., max_length=100)
@@ -70,7 +70,7 @@ class DemoPersonaSwitchRequest(BaseModel):
     target_role: UserRole
 
 
-# ─── Case & Evidence Models ───────────────────────────────────────────────────
+# â”€â”€â”€ Case & Evidence Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ForensicCaseCreate(BaseModel):
     case_number: str = Field(..., min_length=1, max_length=64)
@@ -117,7 +117,7 @@ class TimelineEventRecord(BaseModel):
     event_hash: str = ""
 
 
-# ─── Device Intelligence Models ───────────────────────────────────────────────
+# â”€â”€â”€ Device Intelligence Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DeviceDescriptor(BaseModel):
     device_id: str
@@ -136,6 +136,10 @@ class DeviceDescriptor(BaseModel):
     mount_points: List[str] = Field(default_factory=list)
     hardware_qualification_status: str
     safety_block_reason: Optional[str] = None
+    # Cloud/demo transparency fields
+    source: str = "PHYSICAL_HARDWARE"
+    execution_mode: str = "REAL_HARDWARE"
+    is_physical_device: bool = True
 
 
 class MethodQualificationItem(BaseModel):
@@ -146,7 +150,7 @@ class MethodQualificationItem(BaseModel):
     explanation: str
 
 
-# ─── Recovery Models ──────────────────────────────────────────────────────────
+# â”€â”€â”€ Recovery Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RecoveryScanRequest(BaseModel):
     source_path: str
@@ -232,7 +236,7 @@ class RecoveryExtractResponse(BaseModel):
     message: str
 
 
-# ─── Sanitization Models ──────────────────────────────────────────────────────
+# â”€â”€â”€ Sanitization Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class SanitizationPlanRequest(BaseModel):
     target_path: str
@@ -269,7 +273,7 @@ class SanitizationExecuteRequest(BaseModel):
 
 
 
-# ─── Verification & Audit Models ──────────────────────────────────────────────
+# â”€â”€â”€ Verification & Audit Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AuditEventRecord(BaseModel):
     sequence: int
@@ -299,7 +303,7 @@ class SectorBlockState(BaseModel):
     entropy: float
 
 
-# ─── Real-Time Job Models ────────────────────────────────────────────────────
+# â”€â”€â”€ Real-Time Job Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class OperationContext(BaseModel):
     case_id: str
@@ -395,7 +399,7 @@ class CaseRestoreResponse(BaseModel):
     status: str = "RESTORE_COMPLETED"
 
 
-# ─── Certificate & Attestation Models ─────────────────────────────────────────
+# â”€â”€â”€ Certificate & Attestation Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class CertificateGenerateRequest(BaseModel):
     case_id: str
@@ -453,7 +457,7 @@ class CertificateVerifyResponse(BaseModel):
     details: List[str] = Field(default_factory=list)
 
 
-# ─── Validation & Performance Lab Models ──────────────────────────────────────
+# â”€â”€â”€ Validation & Performance Lab Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ValidationRunRequest(BaseModel):
     case_id: str
@@ -574,7 +578,7 @@ class PerformanceTelemetryModel(BaseModel):
     environment_notes: Optional[str] = None
 
 
-# ─── Phase 21 Native Desktop Dialog & System Version Models ──────────────────
+# â”€â”€â”€ Phase 21 Native Desktop Dialog & System Version Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DialogPickRequest(BaseModel):
     title: Optional[str] = "Select Target"
